@@ -523,6 +523,8 @@ const SUB={
     <div class="fld"><label>Chave (igual à CHAVE no script)</label><input id="stok" value="${esc(c.token)}" placeholder="troque-esta-chave"></div>
     <div class="fld"><div class="tg"><span>Sincronizar automaticamente</span><input type="checkbox" id="sauto" ${c.auto?'checked':''}></div></div>
     <div style="display:flex;gap:8px"><button class="btn" style="flex:1" onclick="salvaSync()">Salvar</button><button class="btn pri" style="flex:1" onclick="salvaSync();syncNow(true)">Sincronizar agora</button></div></div>
+    <div class="card"><h2>💌 Convidar meu par</h2><p class="mut" style="margin-bottom:10px">Gera um link que, aberto no celular do seu par, instala a conexão com a planilha automaticamente. Envie só para ele(a): o link contém a chave.</p>
+    ${c.url&&c.token?`<button class="btn pri wide" onclick="convidar()">📤 Enviar convite</button><div class="fld" style="margin-top:10px"><label>Ou copie o link</label><input id="convl" readonly value="${esc(linkConvite())}" onclick="this.select()"></div><button class="btn wide" onclick="copiaConvite()">📋 Copiar link do convite</button>`:'<div class="empty">Salve primeiro a URL e a chave acima.</div>'}</div>
     <div class="card"><h2>Como configurar</h2><ol class="steps"><li>Crie uma planilha no <b>Google Sheets</b>.</li><li><b>Extensões → Apps Script</b>, apague tudo e cole o código abaixo.</li><li>Troque <b>CHAVE</b> por uma senha só de vocês.</li><li><b>Implantar → Nova implantação → App da Web</b>. Executar como: <b>Eu</b>. Acesso: <b>Qualquer pessoa</b>.</li><li>1IU4VvJEEwBtjYad_BWVxCQN3xicit64qzW0cPaYBjMrvP1V8IxQfcmKs.</li></ol>
     <pre class="code" id="gsview"></pre><button class="btn wide" onclick="copiaGS()">📋 Copiar código do Apps Script</button></div>
     <div class="card"><h2>Dados</h2><div class="grid2"><button class="btn" onclick="exportar()">⬇️ Exportar JSON</button><button class="btn" onclick="$('#impf').click()">⬆️ Importar JSON</button><button class="btn" onclick="demo()">🧪 Dados de exemplo</button><button class="btn danger" onclick="zerar()">🗑️ Apagar tudo</button></div><input type="file" id="impf" accept=".json,application/json" hidden onchange="importar(this)"></div>`}
@@ -674,7 +676,24 @@ function editCat(id){const c=id?byId('cats',id):{emoji:'🏷️',cor:'#4da3ff'};
 
 /* ================== AJUSTES / DADOS ================== */
 function salvaNomes(){S.cfg.nomes=[$('#n1').value.trim()||'Pessoa 1',$('#n2').value.trim()||'Pessoa 2'];S.cfg.u=now();save();toast('Nomes salvos');render()}
-function salvaSync(){S.cfg.url=$('#surl').value.trim();S.cfg.token=$('#stok').value.trim();S.cfg.auto=$('#sauto').checked;saveLocal();toast('Configuração salva');updDot()}
+function salvaSync(){S.cfg.url=$('#surl').value.trim();S.cfg.token=$('#stok').value.trim();S.cfg.auto=$('#sauto').checked;saveLocal();toast('Configuração salva');updDot();if(V.sub==='sync')render()}
+/* ---- Convite: link com URL + chave no fragmento (#), que não é enviado a nenhum servidor ---- */
+const b64e=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64d=s=>decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/'))));
+function linkConvite(){return location.origin+location.pathname+'#conectar='+b64e(JSON.stringify({u:S.cfg.url,t:S.cfg.token,n:S.cfg.nomes}))}
+function convidar(){const url=linkConvite(),txt='Vamos organizar nossas finanças juntos 💙 Abra este link no Safari/Chrome para conectar o app à nossa planilha:';
+  if(navigator.share)navigator.share({title:'Finanças a Dois',text:txt,url}).catch(()=>{});else copiaConvite()}
+function copiaConvite(){const url=linkConvite();(navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast('Link do convite copiado 📋')).catch(()=>{const i=$('#convl');if(i){i.focus();i.select()}toast('Selecionado — toque e segure para copiar')})}
+function lerConvite(){
+  const m=location.hash.match(/^#conectar=([\w-]+)/);if(!m)return;
+  history.replaceState(null,'',location.pathname);
+  let d;try{d=JSON.parse(b64d(m[1]))}catch(e){toast('Convite inválido');return}
+  if(!d.u||!/^https:\/\/script\.google(usercontent)?\.com\//.test(d.u)){toast('Convite inválido');return}
+  if(S.cfg.url&&S.cfg.url!==d.u&&!confirm('Este aparelho já está conectado a outra planilha. Trocar pela do convite?'))return;
+  S.cfg.url=d.u;S.cfg.token=d.t||'';S.cfg.auto=true;
+  if(Array.isArray(d.n)&&d.n.length===2&&(S.cfg.u||0)===0)S.cfg.nomes=d.n;
+  saveLocal();toast('💙 Conectado à planilha do casal! Sincronizando…');syncNow(false).then(()=>{render();if(!syncErr)toast('☁️ Dados do casal carregados')});
+}
 function copiaGS(){const t=$('#gsCode').textContent.trim();(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Código copiado 📋')).catch(()=>{const r=document.createRange();r.selectNodeContents($('#gsview'));getSelection().removeAllRanges();getSelection().addRange(r);toast('Selecionado — copie manualmente')})}
 function exportar(){const b=new Blob([JSON.stringify(syncData(),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='financas-casal-'+today()+'.json';a.click()}
 function importar(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{merge(JSON.parse(r.result));save();render();toast('Dados importados ✓')}catch(e){toast('Arquivo inválido')}};r.readAsText(f)}
@@ -783,6 +802,7 @@ function demo(){
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 render();
+lerConvite();
 if(location.hash==='#novo'){history.replaceState(null,'',location.pathname);novoLanc('gasto')}
 if(S.cfg.url)setTimeout(()=>syncNow(false),800);
 </script>
