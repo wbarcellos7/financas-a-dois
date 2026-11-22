@@ -132,6 +132,11 @@ nav .fab svg{width:26px;height:26px}
 .fld select option{background:#07180f}
 .fld input.big{font-size:32px;font-weight:800;text-align:center;padding:14px;letter-spacing:-.8px}
 .fld input[type=color]{height:44px;padding:4px}
+.imp{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}.imp:last-child{border-bottom:0}
+.imp.off{opacity:.42}.imp .tx{flex:1;min-width:0}.imp .tx b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.imp .tx span{font-size:11.5px;color:var(--mut)}.imp select{margin-top:5px;width:100%;background:rgba(0,0,0,.25);border:1px solid var(--bd);border-radius:9px;padding:5px 7px;font-size:12px;color:inherit}
+.imp select option{background:#07180f}.imp .val{font-size:13.5px}.implist{max-height:46vh;overflow:auto;margin:4px -2px 12px;padding:0 2px}
+.drop{border:1.5px dashed rgba(110,231,183,.4);border-radius:16px;padding:18px;text-align:center;cursor:pointer;background:rgba(16,185,129,.06)}
 .tg{display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.2);border:1px solid var(--bd);border-radius:12px;padding:11px 13px}
 .tg input{width:auto;accent-color:var(--acc)}
 .ptr{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top));z-index:15;width:40px;height:40px;margin-left:-20px;border-radius:50%;background:#0a2219;border:1px solid var(--bd2);color:var(--acc2);display:grid;place-items:center;font-size:18px;transform:translateY(-80px);opacity:0;transition:opacity .2s}
@@ -168,6 +173,7 @@ pre.code{background:rgba(0,0,0,.4);border:1px solid var(--bd);border-radius:12px
 <div class="ov" id="ov" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet"><div class="grab" id="grab"><i></i></div><div id="shb"></div></div>
 <div class="toast" id="toast"></div>
+<input type="file" id="ofxf" accept=".ofx,.qfx,.csv,.txt,application/x-ofx,text/csv,text/plain" hidden onchange="lerExtrato(this)">
 
 <script type="text/plain" id="gsCode">/**
  * Finanças a Dois — backend Google Sheets (Apps Script)
@@ -484,7 +490,8 @@ function vExtrato(){
   let L=lancM(V.ym).filter(l=>f==='todos'||l.tipo===f).sort((a,b)=>b.data.localeCompare(a.data)||b.u-a.u);
   const t=tot(V.ym);
   let h=`<div class="card"><div class="seg">${[['todos','Todos'],['gasto','Gastos'],['entrada','Entradas'],['guardar','Guardado']].map(([k,n])=>`<button class="${f===k?'on':''}" onclick="V.filtro='${k}';render()">${n}</button>`).join('')}</div>
-  <div class="row3"><div class="mini"><span>Entrou</span><b class="pos">${fmtC(t.ent)}</b></div><div class="mini"><span>Gastei</span><b style="color:var(--pink)">${fmtC(t.gas)}</b></div><div class="mini"><span>Guardei</span><b class="sav">${fmtC(t.gua)}</b></div></div></div>`;
+  <div class="row3"><div class="mini"><span>Entrou</span><b class="pos">${fmtC(t.ent)}</b></div><div class="mini"><span>Gastei</span><b style="color:var(--pink)">${fmtC(t.gas)}</b></div><div class="mini"><span>Guardei</span><b class="sav">${fmtC(t.gua)}</b></div></div>
+  <button class="btn wide" style="margin-top:12px" onclick="abrirImport()">⬆️ Importar extrato do banco (OFX/CSV)</button></div>`;
   if(!L.length)return h+'<div class="card"><div class="empty">Nenhum lançamento</div></div>';
   const g={};L.forEach(l=>(g[l.data]=g[l.data]||[]).push(l));
   h+='<div class="card list" style="padding-top:4px">';
@@ -523,6 +530,7 @@ const SUB={
     <div class="s"><span>Limite ${fmt(c.limite)}</span><span>Disponível ${fmt(i.disp)}</span></div>
     <div class="s"><span>Teto do casal ${c.teto?fmt(c.teto):'—'}</span><span>${+c.cb?c.cb+'% cashback':''}${+c.pts?' '+c.pts+' pts/R$':''}</span></div></div>`}).join('')+(S.cartoes.length?'':'<div class="card"><div class="empty">Cadastre seus cartões para ver gauges, faturas e cashback.</div></div>')+`<p class="mut">“Teto” é o limite que vocês combinaram gastar na fatura (marcador branco). Parcelas futuras contam no limite comprometido.</p>`},
   bancos(){return`<button class="btn pri wide" onclick="editBanco()">+ Nova conta bancária</button><div class="card list">${S.bancos.map(b=>`<div class="it" onclick="editBanco('${b.id}')"><div class="ic" style="background:${b.cor||'#10b981'}44">🏦</div><div class="tx"><b>${esc(b.nome)}</b><span>Saldo base ${fmt(b.saldo)} em ${fmtD(b.dataBase)}</span></div><div class="val ${saldoBanco(b)>=0?'pos':'neg'}">${fmt(saldoBanco(b))}</div></div>`).join('')||'<div class="empty">Nenhum banco cadastrado</div>'}</div>
+    <button class="btn wide" style="margin-bottom:12px" onclick="abrirImport()">⬆️ Importar extrato (OFX/CSV)</button>
     <p class="mut">O saldo atual = saldo base + entradas − gastos (Pix/débito/boleto/dinheiro) lançados nesse banco a partir da data base. Para corrigir, edite o saldo base.</p>`},
   fixas(){return`<button class="btn pri wide" onclick="editFixa()">+ Nova conta fixa</button><div class="card list">${S.fixas.map(f=>{const c=catOf(f.cat);return`<div class="it" onclick="editFixa('${f.id}')" style="${f.ativo===false?'opacity:.45':''}"><div class="ic" style="background:${c.cor}33">${c.emoji}</div><div class="tx"><b>${esc(f.nome)}</b><span>Todo dia ${f.dia} · ${(FORMAS.find(x=>x[0]===f.forma)||['','Pix'])[1]}${f.ativo===false?' · pausada':''}</span></div><div class="val">${fmt(f.valor)}</div></div>`}).join('')||'<div class="empty">Aluguel, internet, luz, streaming…</div>'}</div>
     <div class="card"><div class="kv"><span>Total mensal fixo</span><b>${fmt(sum(S.fixas.filter(f=>f.ativo!==false),f=>f.valor))}</b></div></div><p class="mut">As contas fixas viram automaticamente “contas a vencer” em cada mês.</p>`},
@@ -555,7 +563,7 @@ const SUB={
     <div style="display:flex;gap:8px"><button class="btn" style="flex:1" onclick="salvaSync()">Salvar</button><button class="btn pri" style="flex:1" onclick="salvaSync();syncNow(true)">Sincronizar agora</button></div></div>
     <div class="card"><h2>💌 Convidar meu par</h2><p class="mut" style="margin-bottom:10px">Gera um link que, aberto no celular do seu par, instala a conexão com a planilha automaticamente. Envie só para ele(a): o link contém a chave.</p>
     ${c.url&&c.token?`<button class="btn pri wide" onclick="convidar()">📤 Enviar convite</button><div class="fld" style="margin-top:10px"><label>Ou copie o link</label><input id="convl" readonly value="${esc(linkConvite())}" onclick="this.select()"></div><button class="btn wide" onclick="copiaConvite()">📋 Copiar link do convite</button>`:'<div class="empty">Salve primeiro a URL e a chave acima.</div>'}</div>
-    <div class="card"><h2>Como configurar</h2><ol class="steps"><li>Crie uma planilha no <b>Google Sheets</b>.</li><li><b>Extensões → Apps Script</b>, apague tudo e cole o código abaixo.</li><li>Troque <b>CHAVE</b> por uma senha só de vocês.</li><li><b>Implantar → Nova implantação → App da Web</b>. Executar como: <b>Eu</b>. Acesso: <b>Qualquer pessoa</b>.</li><li>1IU4VvJEEwBtjYad_BWVxCQN3xicit64qzW0cPaYBjMrvP1V8IxQfcmKs.</li></ol>
+    <div class="card"><h2>Como configurar</h2><ol class="steps"><li>Crie uma planilha no <b>Google Sheets</b>.</li><li><b>Extensões → Apps Script</b>, apague tudo e cole o código abaixo.</li><li>Troque <b>CHAVE</b> por uma senha só de vocês.</li><li><b>Implantar → Nova implantação → App da Web</b>. Executar como: <b>Eu</b>. Acesso: <b>Qualquer pessoa</b>.</li><li>Copie a URL que termina em <b>/exec</b> e cole acima, junto com a chave.</li></ol>
     <pre class="code" id="gsview"></pre><button class="btn wide" onclick="copiaGS()">📋 Copiar código do Apps Script</button></div>
     <div class="card"><h2>Dados</h2><div class="grid2"><button class="btn" onclick="exportar()">⬇️ Exportar JSON</button><button class="btn" onclick="$('#impf').click()">⬆️ Importar JSON</button><button class="btn" onclick="demo()">🧪 Dados de exemplo</button><button class="btn danger" onclick="zerar()">🗑️ Apagar tudo</button></div><input type="file" id="impf" accept=".json,application/json" hidden onchange="importar(this)"></div>`}
 };
@@ -659,6 +667,117 @@ function lancSave(d){
   }else{const nw=!d.id;upsert('lanc',{...d,id:d.id||uid()});toast(nw?'Lançado ✓':'Atualizado ✓')}
 }
 /* ---- Contas ---- */
+/* ---- Importar extrato (OFX / CSV) ---- */
+let IMP=null;
+const normTx=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z ]+/g,' ').replace(/\s+/g,' ').trim();
+const hashS=s=>{let h=5381;s=String(s);for(let i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36)};
+const addDay=(d,n)=>{const x=new Date(d+'T12:00');x.setDate(x.getDate()+n);return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())};
+const parseAmt=s=>{s=String(s??'').replace(/[R$\s]/g,'');const neg=/^\(.*\)$/.test(s)||s.includes('-');s=s.replace(/[()+\-]/g,'');
+  if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+  else if(s.includes(','))s=s.replace(',','.');
+  const n=parseFloat(s);return isNaN(n)?NaN:Math.round((neg?-n:n)*100)/100};
+const parseDt=s=>{s=String(s||'').trim();let m=s.match(/^(\d{4})-?(\d{2})-?(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];
+  m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);if(m)return(m[3].length===2?'20'+m[3]:m[3])+'-'+pad(+m[2])+'-'+pad(+m[1]);return''};
+const unEnt=s=>s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&apos;|&#39;/g,"'").replace(/&quot;/g,'"');
+const CAT_KW=[
+  ['cat7',/netflix|spotify|prime video|amazon prime|disney|hbo|globoplay|youtube|apple com|icloud|google one|deezer|paramount|openai|chatgpt|microsoft|adobe|assinatura|crunchyroll/],
+  ['cat3',/ifood|i food|restaur|lanchon|burger|mcdonald|mc donald|pizz|sushi|cafeter|starbucks|subway|outback|rappi|ze delivery|habib|spoleto|giraffas|bob s|padaria|panific|sorvet|acai|lanche/],
+  ['cat0',/mercad|supermerc|atacad|assai|carrefour|pao de acucar|hortifrut|sacolao|acougue|hiper|sams club|makro|oba |st marche|zaffari|savegnago|condor|angeloni/],
+  ['cat2',/uber|99 ?app|99pop|99 tecnologia|posto|combust|shell|ipiranga|petrobras|br mania|estacion|sem parar|conectcar|veloe|pedagio|metro|onibus|bilhete unico|cabify|auto pecas|oficina|detran|ipva|seguro auto/],
+  ['cat5',/farmac|drogar|droga raia|drogasil|pague menos|panvel|hospital|clinic|laborat|unimed|amil|hapvida|bradesco saude|sulamerica|dentist|odonto|medic|academia|smart ?fit|bluefit|psicolog|fisioter/],
+  ['cat8',/petz|cobasi|petshop|pet shop|veterin|racao|petlove/],
+  ['cat6',/escola|faculdade|universid|curso|udemy|alura|livrar|colegio|mensalidade escolar|ingles|idiomas/],
+  ['cat4',/cinema|cinemark|ingresso|sympla|eventim|steam|playstation|xbox|nintendo|hotel|airbnb|booking|decolar|latam|gol linhas|azul linhas|parque|teatro|show|bar /],
+  ['cat1',/aluguel|condomin|energia|enel|cemig|copel|light s|cpfl|celesc|coelba|sabesp|saneam|copasa|agua e esgoto|internet|vivo|claro|tim |net servicos|comgas|gas natural|leroy|telhanorte|casas bahia|magazine|tok ?stok|ikea|iptu|eletro/],
+  ['cat10',/salario|folha de pag|proventos|remuneracao|pagamento de salario|vencimentos/]];
+function catSugerida(desc,entrada,learn){
+  const n=normTx(desc),k=n.split(' ').slice(0,3).join(' ');
+  if(learn[k]&&byId('cats',learn[k]))return learn[k];
+  for(const[c,re]of CAT_KW){if((c==='cat10')!==entrada)continue;if(re.test(' '+n+' ')&&byId('cats',c))return c}
+  const nm=S.cats.find(c=>c.nome.length>3&&n.includes(normTx(c.nome)));if(nm)return nm.id;
+  const d=entrada?'cat11':'cat9';return byId('cats',d)?d:(S.cats[0]?.id||'')}
+function parseOFX(t){
+  const tag=(b,n)=>{const m=b.match(new RegExp('<'+n+'>([^<\\r\\n]*)','i'));return m?unEnt(m[1].trim()):''};
+  const items=(t.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi)||t.split(/<STMTTRN>/i).slice(1)).map(b=>({data:parseDt(tag(b,'DTPOSTED')),v:parseAmt(tag(b,'TRNAMT')),desc:tag(b,'MEMO')||tag(b,'NAME')||tag(b,'TRNTYPE'),fit:tag(b,'FITID')}));
+  const lb=(t.match(/<LEDGERBAL>[\s\S]*?(<\/LEDGERBAL>|<AVAILBAL>|$)/i)||[''])[0];
+  const sal=tag(lb,'BALAMT');
+  return{items,card:/<CCSTMTRS>|<CREDITCARDMSGSRSV1>/i.test(t),acct:tag(t,'ACCTID'),saldo:sal?parseAmt(sal):null,saldoData:parseDt(tag(lb,'DTASOF'))}}
+function parseCSV(t){
+  const lines=t.split(/\r?\n/).filter(l=>l.trim());if(lines.length<2)return null;
+  const cnt=(l,c)=>l.split(c).length-1;
+  let hi=lines.findIndex(l=>/data|date/i.test(l)&&/valor|amount|value|quantia|cr[eé]dito|d[eé]bito/i.test(l));if(hi<0)hi=0;
+  const sep=[';',',','\t'].sort((a,b)=>cnt(lines[hi],b)-cnt(lines[hi],a))[0];
+  const split=l=>{const r=[];let cur='',q=false;for(const ch of l){if(ch==='"')q=!q;else if(ch===sep&&!q){r.push(cur);cur=''}else cur+=ch}r.push(cur);return r.map(x=>x.trim())};
+  const H=split(lines[hi]).map(normTx),fi=re=>H.findIndex(h=>re.test(h));
+  const iD=fi(/^data|^date|^dt/),iV=fi(/valor|amount|value|quantia/),iT=fi(/descri|histor|title|estabelec|lancamento|memo|nome|detalhe|identifica/),iC=fi(/credito|entrada/),iDb=fi(/debito|saida/);
+  if(iD<0||(iV<0&&iC<0&&iDb<0))return null;
+  const items=[];
+  lines.slice(hi+1).forEach(l=>{const c=split(l),d=parseDt(c[iD]);
+    const v=iV>=0?parseAmt(c[iV]):(Math.abs(parseAmt(c[iC]))||0)-(Math.abs(parseAmt(c[iDb]))||0);
+    if(d&&!isNaN(v)&&v)items.push({data:d,v,desc:iT>=0?c[iT]:'',fit:''})});
+  return{items,card:H.includes('title'),acct:'',saldo:null,saldoData:''}}
+function abrirImport(){const i=$('#ofxf');i.value='';i.click()}
+function lerExtrato(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{let t=new TextDecoder('utf-8').decode(r.result);if(t.includes('�'))t=new TextDecoder('windows-1252').decode(r.result);
+    let P=null;try{P=/<OFX>|OFXHEADER|<STMTTRN>/i.test(t)?parseOFX(t):parseCSV(t)}catch(e){}
+    if(P)P.items=P.items.filter(x=>x.data&&!isNaN(x.v)&&x.v);
+    if(!P||!P.items.length){toast('Não encontrei lançamentos neste arquivo');return}
+    if(!S.bancos.length&&!S.cartoes.length){toast('Cadastre um banco ou cartão primeiro');openSub('bancos');return}
+    const ah=P.acct?hashS(P.acct):'';
+    const kc=ah&&S.cartoes.find(c=>c.ofx===ah),kb=ah&&S.bancos.find(b=>b.ofx===ah);
+    const dest=kc?'c:'+kc.id:kb?'b:'+kb.id:P.card&&S.cartoes[0]?'c:'+S.cartoes[0].id:S.bancos[0]?'b:'+S.bancos[0].id:'c:'+S.cartoes[0].id;
+    IMP={...P,ah,src:f.name,dest,quem:'Casal',inv:null,salOn:true};impPrep();impSheet()};
+  r.readAsArrayBuffer(f)}
+function impPrep(){
+  const I=IMP,card=I.dest.startsWith('c:');
+  const pos=I.items.filter(x=>x.v>0).length;
+  if(I.inv===null)I.inv=card&&pos>I.items.length-pos;
+  const learn={};S.lanc.slice().sort((a,b)=>(a.u||0)-(b.u||0)).forEach(l=>{if(l.cat&&l.desc)learn[normTx(l.desc).split(' ').slice(0,3).join(' ')]=l.cat});
+  const base=I.ah||I.dest,seen={};
+  I.rows=I.items.map(x=>{
+    const v=I.inv?-x.v:x.v,entrada=v>0,valor=Math.abs(v),nd=normTx(x.desc);
+    let key=x.fit||(x.data+'|'+x.v+'|'+nd);seen[key]=(seen[key]||0)+1;if(!x.fit&&seen[key]>1)key+='#'+seen[key];
+    const id='imp_'+hashS(base+'|'+key);
+    const desc=x.desc.replace(/\s+/g,' ').trim().slice(0,70)||(entrada?'Entrada':'Gasto');
+    const r={id,data:x.data,desc,valor,tipo:entrada?'entrada':'gasto',sel:true,nota:'',
+      forma:card?'credito':/\bpix\b/i.test(nd)?'pix':/boleto|titulo|pagto|pagamento/.test(nd)?'boleto':'debito',
+      cat:catSugerida(x.desc,entrada,learn)};
+    if(byId('lanc',id)){r.sel=false;r.nota='já importado';r.ja=true}
+    else if(card&&entrada){r.sel=false;r.nota='pagamento/estorno'}
+    else if(!card&&!entrada&&/fatura|pag(to|amento)? ?(de )?cart|cartao de credito/.test(nd)){r.sel=false;r.nota='pagamento de fatura'}
+    else if(/aplicac|resgate|rende facil|poupanca|invest|cdb|tesouro|transf(erencia)? entre contas|mesma titularidade/.test(nd)){r.sel=false;r.nota='aplicação/transferência'}
+    else if(S.lanc.some(l=>!String(l.id).startsWith('imp_')&&l.tipo===r.tipo&&Math.abs(l.valor-valor)<.005&&Math.abs((new Date(l.data)-new Date(x.data))/864e5)<=3)){r.sel=false;r.nota='parece já lançado'}
+    return r}).sort((a,b)=>b.data.localeCompare(a.data));
+}
+function impSheet(){
+  const I=IMP,R=I.rows,card=I.dest.startsWith('c:'),b=!card&&byId('bancos',I.dest.slice(2));
+  const destOpts=[...S.bancos.map(x=>['b:'+x.id,'🏦 '+x.nome]),...S.cartoes.map(x=>['c:'+x.id,'💳 '+x.nome])];
+  const fn=f=>(FORMAS.find(x=>x[0]===f)||['',''])[1];
+  let h=`<h3>Importar extrato</h3><p class="mut" style="margin:-4px 0 12px">${esc(I.src)} · ${R.length} lançamento${R.length>1?'s':''}</p>
+  <div class="fld"><label>De qual conta é este extrato?</label><select onchange="IMP.dest=this.value;IMP.inv=null;impPrep();impSheet()">${destOpts.map(([a,n])=>`<option value="${a}" ${a===I.dest?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
+  <div class="fld"><label>De quem?</label><div class="seg">${quemOpts().map(([a],i)=>`<button type="button" class="${I.quem===a?'on':''}" onclick="impQuem(${i})">${esc(a)}</button>`).join('')}</div></div>`;
+  if(b&&I.saldo!==null&&I.saldoData)h+=`<div class="fld"><div class="tg"><span>Atualizar saldo de ${esc(b.nome)} para <b>${fmt(I.saldo)}</b> (saldo do extrato em ${fmtD(I.saldoData)})</span><input type="checkbox" ${I.salOn?'checked':''} onchange="IMP.salOn=this.checked"></div></div>`;
+  h+=`<div class="h" style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 2px"><span class="mut" style="font-size:12px">Toque para marcar ou desmarcar</span><span style="white-space:nowrap;font-size:13px"><button class="lnk" onclick="impTodos(1)">Todos</button> · <button class="lnk" onclick="impTodos(0)">Nenhum</button></span></div>
+  <div class="implist">${R.map((r,i)=>`<div class="imp ${r.sel?'':'off'}" id="imp${i}"><div class="chk ${r.sel?'on':''}" onclick="impTog(${i})">${r.sel?'✓':''}</div>
+    <div class="tx" ><b onclick="impTog(${i})">${esc(r.desc)}</b><span>${fmtD(r.data)}/${r.data.slice(2,4)} · ${r.tipo==='entrada'?'entrada':fn(r.forma)}${r.nota?` · <span class="chip ${r.ja?'info':'warn'}">${r.nota}</span>`:''}</span>
+    <select onchange="IMP.rows[${i}].cat=this.value">${S.cats.map(c=>`<option value="${c.id}" ${c.id===r.cat?'selected':''}>${c.emoji} ${esc(c.nome)}</option>`).join('')}</select></div>
+    <div class="val ${r.tipo==='entrada'?'pos':'neg'}">${r.tipo==='entrada'?'+':'−'} ${fmt(r.valor)}</div></div>`).join('')}</div>
+  <button class="btn pri wide" id="impbtn" onclick="impSalvar()"></button>
+  <button class="lnk" style="display:block;margin:10px auto 0" onclick="IMP.inv=!IMP.inv;impPrep();impSheet()">Valores com sinal trocado? Inverter entradas/gastos</button>
+  <p class="mut" style="font-size:12px;margin-top:10px">Os lançamentos que já existem ficam desmarcados, para não duplicar. Para baixar o arquivo, procure no app ou site do banco: Extrato → Exportar → OFX (ou CSV).</p>`;
+  openSheet(h);impCount()}
+function impCount(){const n=IMP.rows.filter(r=>r.sel).length,b=$('#impbtn');if(b){b.textContent=n?`Importar ${n} lançamento${n>1?'s':''}`:'Nada selecionado';b.disabled=!n;b.style.opacity=n?1:.5}}
+function impTog(i){const r=IMP.rows[i];r.sel=!r.sel;const el=$('#imp'+i);el.classList.toggle('off',!r.sel);const c=el.querySelector('.chk');c.classList.toggle('on',r.sel);c.textContent=r.sel?'✓':'';impCount()}
+function impTodos(v){IMP.rows.forEach((r,i)=>{if(!!r.sel!==!!v&&!(v&&r.ja))impTog(i)})}
+function impQuem(i){IMP.quem=quemOpts()[i][0];document.querySelectorAll('#shb .seg button').forEach((x,k)=>x.classList.toggle('on',k===i))}
+function impSalvar(){
+  const I=IMP,card=I.dest.startsWith('c:'),did=I.dest.slice(2);let n=0,last='';
+  I.rows.forEach(r=>{if(!r.sel)return;const g=r.tipo==='gasto';
+    upsert('lanc',{id:r.id,tipo:r.tipo,valor:r.valor,desc:r.desc,cat:r.cat,forma:g?r.forma:'',cartaoId:card&&g?did:'',bancoId:card?'':did,metaId:'',quem:I.quem,data:r.data,imp:1},true);n++;if(r.data>last)last=r.data});
+  if(!card&&I.salOn&&I.saldo!==null&&I.saldoData){const b=byId('bancos',did);if(b)upsert('bancos',{...b,saldo:I.saldo,dataBase:addDay(I.saldoData,1)},true)}
+  if(I.ah){const col=card?'cartoes':'bancos',o=byId(col,did);if(o&&o.ofx!==I.ah)upsert(col,{...o,ofx:I.ah},true)}
+  save();closeSheet();IMP=null;if(last)V.ym=ymOf(last);render();toast(n+' lançamento'+(n!==1?'s':'')+' importado'+(n!==1?'s':'')+' ✓')}
+
 function editConta(id){const c=id?byId('contas',id):{venc:mkDate(V.ym,10),cat:'cat1',pago:false};
   formSheet({title:id?'Editar conta':'Nova conta',data:{...c},fields:[{k:'nome',label:'Nome',req:true,ph:'Ex.: IPVA'},{k:'valor',t:'money',label:'Valor',req:true},{k:'venc',t:'date',label:'Vencimento',req:true},{k:'cat',t:'select',label:'Categoria',opts:catOpts}],
     onSave:d=>upsert('contas',{...d,id:d.id||uid()}),onDelete:id?x=>{removeIt('contas',x.id);if(byId('lanc','pg_'+x.id))removeIt('lanc','pg_'+x.id)}:null})}
