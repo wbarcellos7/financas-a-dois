@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "Finanças a Dois",
   "short_name": "Finanças",
   "description": "Finanças do casal: sobra do mês, contas, cartões, metas e tarefas — funciona offline e sincroniza com Google Sheets.",
@@ -8,8 +8,8 @@
   "display": "standalone",
   "orientation": "portrait",
   "lang": "pt-BR",
-  "background_color": "#050f2b",
-  "theme_color": "#071a45",
+  "background_color": "#030d09",
+  "theme_color": "#030d09",
   "categories": ["finance", "productivity"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
