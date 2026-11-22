@@ -565,7 +565,7 @@ const SUB={
     ${c.url&&c.token?`<button class="btn pri wide" onclick="convidar()">📤 Enviar convite</button><div class="fld" style="margin-top:10px"><label>Ou copie o link</label><input id="convl" readonly value="${esc(linkConvite())}" onclick="this.select()"></div><button class="btn wide" onclick="copiaConvite()">📋 Copiar link do convite</button>`:'<div class="empty">Salve primeiro a URL e a chave acima.</div>'}</div>
     <div class="card"><h2>Como configurar</h2><ol class="steps"><li>Crie uma planilha no <b>Google Sheets</b>.</li><li><b>Extensões → Apps Script</b>, apague tudo e cole o código abaixo.</li><li>Troque <b>CHAVE</b> por uma senha só de vocês.</li><li><b>Implantar → Nova implantação → App da Web</b>. Executar como: <b>Eu</b>. Acesso: <b>Qualquer pessoa</b>.</li><li>Copie a URL que termina em <b>/exec</b> e cole acima, junto com a chave.</li></ol>
     <pre class="code" id="gsview"></pre><button class="btn wide" onclick="copiaGS()">📋 Copiar código do Apps Script</button></div>
-    <div class="card"><h2>Dados</h2><div class="grid2"><button class="btn" onclick="exportar()">⬇️ Exportar JSON</button><button class="btn" onclick="$('#impf').click()">⬆️ Importar JSON</button><button class="btn" onclick="demo()">🧪 Dados de exemplo</button><button class="btn danger" onclick="zerar()">🗑️ Apagar tudo</button></div><input type="file" id="impf" accept=".json,application/json" hidden onchange="importar(this)"></div>`}
+    <div class="card"><h2>Dados</h2><div class="grid2"><button class="btn" onclick="exportar()">⬇️ Exportar JSON</button><button class="btn" onclick="$('#impf').click()">⬆️ Importar JSON</button><button class="btn" onclick="demo()">🧪 Dados de exemplo</button><button class="btn danger" onclick="zerar()">🧹 Começar do zero</button></div><input type="file" id="impf" accept=".json,application/json" hidden onchange="importar(this)"></div>`}
 };
 const SUBT={metas:'Metas',tarefas:'Tarefas do casal',cartoes:'Cartões',bancos:'Bancos',fixas:'Contas fixas',limites:'Limites de gasto',recompensas:'Cashback & pontos',relatorios:'Relatórios',categorias:'Categorias',sync:'Sincronizar & ajustes'};
 
@@ -846,7 +846,11 @@ function lerConvite(){
 function copiaGS(){const t=$('#gsCode').textContent.trim();(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Código copiado 📋')).catch(()=>{const r=document.createRange();r.selectNodeContents($('#gsview'));getSelection().removeAllRanges();getSelection().addRange(r);toast('Selecionado — copie manualmente')})}
 function exportar(){const b=new Blob([JSON.stringify(syncData(),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='financas-casal-'+today()+'.json';a.click()}
 function importar(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{merge(JSON.parse(r.result));save();render();toast('Dados importados ✓')}catch(e){toast('Arquivo inválido')}};r.readAsText(f)}
-function zerar(){if(!confirm('Apagar TODOS os dados deste aparelho? (a planilha não é alterada)'))return;const c=S.cfg;S=blank();S.cfg.url=c.url;S.cfg.token=c.token;saveLocal();render();toast('Dados apagados')}
+function zerar(){
+  if(!confirm('Começar do zero?\n\nApaga TODOS os lançamentos, contas, contas fixas, cartões, bancos, metas, tarefas e resgates — neste celular, na planilha e no celular do seu par.\n\nNomes, categorias e a conexão com a planilha continuam.'))return;
+  ['lanc','contas','fixas','cartoes','bancos','metas','tarefas','resgates'].forEach(c=>[...S[c]].forEach(x=>removeIt(c,x.id,true)));
+  S.cfg.limites=blank().cfg.limites;S.cfg.u=now();
+  save();V.ym=ymOf(today());V.tab='home';V.sub=null;render();scrollTo(0,0);toast('Tudo limpo — podem começar ✓');if(S.cfg.url)syncNow(false)}
 
 /* ================== SINCRONIZAÇÃO ================== */
 function syncData(){const o={del:S.del,cfg:{...S.cfg}};delete o.cfg.url;delete o.cfg.token;delete o.cfg.lastSync;delete o.cfg.auto;COLS.forEach(c=>o[c]=S[c]);return o}
